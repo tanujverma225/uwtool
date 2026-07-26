@@ -10,6 +10,9 @@ import {
 } from "@/lib/dates";
 import type { BidStatus, JobResponse } from "@/db/schema";
 import type { CreateBidInput, UpdateBidInput } from "@/types/database";
+import { BID_EXPORT_COLUMNS, rowsToCsv } from "@/lib/export-csv";
+import { formatEstDate } from "@/lib/dates";
+import { requireAdmin } from "@/lib/auth";
 
 function getJoinedProfileName(
   profiles: { full_name: string } | { full_name: string }[] | null | undefined
@@ -49,6 +52,69 @@ export async function checkDuplicateBid(upworkJobId: string) {
     .maybeSingle();
 
   return data;
+}
+
+export type DuplicateBidInfo = {
+  id: string;
+  jobTitle: string;
+  url: string;
+  status: string;
+  bidderName: string;
+  createdAt: string;
+};
+
+export async function checkDuplicateByUrl(url: string) {
+  const parsed = parseUpworkUrl(url);
+  if (!parsed.isValid || !parsed.upworkJobId) {
+    return {
+      valid: false as const,
+      error: "Invalid Upwork job URL",
+      duplicates: [] as DuplicateBidInfo[],
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("bids")
+    .select(
+      "id, job_title, url, status, created_at, profiles:bidder_id(full_name)"
+    )
+    .eq("upwork_job_id", parsed.upworkJobId)
+    .neq("status", "canceled")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    return {
+      valid: true as const,
+      upworkJobId: parsed.upworkJobId,
+      normalizedUrl: parsed.normalizedUrl,
+      duplicates: [] as DuplicateBidInfo[],
+      error: error.message,
+    };
+  }
+
+  const duplicates: DuplicateBidInfo[] = (data ?? []).map((row) => ({
+    id: row.id,
+    jobTitle: row.job_title,
+    url: row.url,
+    status: row.status,
+    bidderName: getJoinedProfileName(
+      row.profiles as
+        | { full_name: string }
+        | { full_name: string }[]
+        | null
+    ),
+    createdAt: row.created_at,
+  }));
+
+  return {
+    valid: true as const,
+    upworkJobId: parsed.upworkJobId,
+    normalizedUrl: parsed.normalizedUrl,
+    duplicates,
+    isDuplicate: duplicates.length > 0,
+  };
 }
 
 export async function createBid(input: CreateBidInput) {
@@ -280,4 +346,64 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
+}
+
+export async function exportBidsCsv(submittedOnly = false) {
+  const { error: authError } = await requireAdmin();
+  if (authError) return { error: authError };
+
+  const bids = await getBids(
+    submittedOnly
+      ? {
+          status: [
+            "submitted",
+            "viewed",
+            "responded",
+            "hired",
+            "lost",
+            "canceled",
+            "no_response",
+          ],
+        }
+      : undefined
+  );
+
+  const rows = (bids ?? []).map((bid) => {
+    const profile = Array.isArray(bid.profiles)
+      ? bid.profiles[0]
+      : bid.profiles;
+    const source = Array.isArray(bid.sources) ? bid.sources[0] : bid.sources;
+
+    return {
+      job_title: bid.job_title,
+      url: bid.url,
+      status: bid.status,
+      job_response: bid.job_response ?? "",
+      bidder_name: profile?.full_name ?? "",
+      bidder_email: profile?.email ?? "",
+      source_name: source?.name ?? "",
+      date_est: formatEstDate(bid.date_est),
+      time_est: bid.time_est ?? "",
+      week_number: bid.week_number ?? "",
+      connects_used: bid.connects_used ?? "",
+      country: bid.country ?? "",
+      client_viewed: bid.client_viewed ? "Yes" : "No",
+      client_responded: bid.client_responded ? "Yes" : "No",
+      shortlisted: bid.shortlisted ? "Yes" : "No",
+      proposal_count_range: bid.proposal_count_range ?? "",
+      meghna_remarks: bid.meghna_remarks ?? "",
+      summary: bid.summary ?? "",
+      questions: bid.questions ?? "",
+      proposal: bid.proposal?.replace(/<[^>]+>/g, " ").trim() ?? "",
+      bid_submitted_at: bid.bid_submitted_at ?? "",
+      created_at: bid.created_at,
+    };
+  });
+
+  const csv = rowsToCsv(rows, [...BID_EXPORT_COLUMNS]);
+  const filename = submittedOnly
+    ? `submitted-bids-${new Date().toISOString().slice(0, 10)}.csv`
+    : `all-bids-${new Date().toISOString().slice(0, 10)}.csv`;
+
+  return { csv, filename };
 }

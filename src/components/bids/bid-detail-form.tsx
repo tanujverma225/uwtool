@@ -10,6 +10,7 @@ import {
   markClientViewed,
   markClientResponded,
 } from "@/lib/actions/bids";
+import type { FieldOptions } from "@/lib/actions/admin";
 import { BID_STATUSES, type BidStatus } from "@/db/schema";
 import { formatEstDate, formatEstDateTime } from "@/lib/dates";
 import { ProposalEditor } from "@/components/bids/proposal-editor";
@@ -59,9 +60,10 @@ interface BidDetailFormProps {
   };
   sources: { id: string; name: string; color: string }[];
   isManager: boolean;
+  fieldOptions?: FieldOptions;
 }
 
-export function BidDetailForm({ bid, isManager }: BidDetailFormProps) {
+export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [proposal, setProposal] = useState(bid.proposal ?? "");
@@ -245,21 +247,54 @@ export function BidDetailForm({ bid, isManager }: BidDetailFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                placeholder="USA, Worldwide"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-              />
+              {fieldOptions?.countries?.length ? (
+                <Select value={country} onValueChange={setCountry}>
+                  <SelectTrigger id="country">
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fieldOptions.countries.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="country"
+                  placeholder="USA, Worldwide"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="proposalCount">Proposal Count Range</Label>
-              <Input
-                id="proposalCount"
-                placeholder="20 to 50"
-                value={proposalCountRange}
-                onChange={(e) => setProposalCountRange(e.target.value)}
-              />
+              {fieldOptions?.proposal_count_ranges?.length ? (
+                <Select
+                  value={proposalCountRange}
+                  onValueChange={setProposalCountRange}
+                >
+                  <SelectTrigger id="proposalCount">
+                    <SelectValue placeholder="Select range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fieldOptions.proposal_count_ranges.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="proposalCount"
+                  placeholder="20 to 50"
+                  value={proposalCountRange}
+                  onChange={(e) => setProposalCountRange(e.target.value)}
+                />
+              )}
             </div>
           </div>
 

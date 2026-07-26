@@ -77,6 +77,13 @@ async function main() {
     ok = ok && permsOk;
   }
 
+  const adminPath = resolve(root, "supabase/migrations/002_admin_settings.sql");
+  if (existsSync(adminPath)) {
+    const adminSql = readFileSync(adminPath, "utf8");
+    const adminOk = await runSqlFile(adminSql, "admin_settings");
+    ok = ok && adminOk;
+  }
+
   if (!ok) {
     console.warn(
       "[supabase-sync] Sync failed — app can still run if schema was applied via Supabase dashboard/MCP."

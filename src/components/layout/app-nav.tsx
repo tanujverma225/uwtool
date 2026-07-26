@@ -8,6 +8,7 @@ import {
   FileText,
   LogOut,
   Plus,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,10 @@ const navItems = [
 
 interface AppNavProps {
   userName?: string;
+  isAdmin?: boolean;
 }
 
-export function AppNav({ userName }: AppNavProps) {
+export function AppNav({ userName, isAdmin }: AppNavProps) {
   const pathname = usePathname();
 
   return (
@@ -49,6 +51,20 @@ export function AppNav({ userName }: AppNavProps) {
                 {label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent",
+                  pathname.startsWith("/admin")
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-3">
@@ -86,6 +102,20 @@ export function AppNav({ userName }: AppNavProps) {
             {label}
           </Link>
         ))}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-2 text-xs font-medium",
+              pathname.startsWith("/admin")
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground"
+            )}
+          >
+            <Settings className="h-4 w-4" />
+            Admin
+          </Link>
+        )}
       </nav>
     </header>
   );

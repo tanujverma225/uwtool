@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
+import Link from "next/link";
 import { createBid } from "@/lib/actions/bids";
 import { parseUpworkUrl } from "@/lib/upwork-url";
+import { DuplicateUrlCheck } from "@/components/bids/duplicate-url-check";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle } from "lucide-react";
 
 interface NewBidFormProps {
   sources: { id: string; name: string; color: string }[];
@@ -32,18 +34,12 @@ export function NewBidForm({ sources }: NewBidFormProps) {
   const [summary, setSummary] = useState("");
   const [questions, setQuestions] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = useState<{
-    id: string;
-    jobTitle: string;
-    bidderName: string;
-  } | null>(null);
 
   const parsed = url ? parseUpworkUrl(url) : null;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setDuplicateWarning(null);
 
     startTransition(async () => {
       const result = await createBid({
@@ -57,10 +53,6 @@ export function NewBidForm({ sources }: NewBidFormProps) {
       if (result.error) {
         setError(result.error);
         return;
-      }
-
-      if (result.duplicate) {
-        setDuplicateWarning(result.duplicate);
       }
 
       if (result.data?.id) {
@@ -84,19 +76,21 @@ export function NewBidForm({ sources }: NewBidFormProps) {
               placeholder="https://www.upwork.com/jobs/~..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData("text");
+                if (pasted) setUrl(pasted.trim());
+              }}
               required
+              autoFocus
             />
-            {parsed && !parsed.isValid && url.length > 10 && (
-              <p className="text-sm text-destructive">
-                Invalid Upwork URL. Use a job link containing the job ID (~...).
-              </p>
-            )}
             {parsed?.isValid && (
               <p className="text-sm text-muted-foreground">
                 Job ID: {parsed.upworkJobId}
               </p>
             )}
           </div>
+
+          <DuplicateUrlCheck url={url} />
 
           <div className="space-y-2">
             <Label htmlFor="jobTitle">Job Title</Label>
@@ -154,22 +148,14 @@ export function NewBidForm({ sources }: NewBidFormProps) {
             </Alert>
           )}
 
-          {duplicateWarning && (
-            <Alert variant="warning">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Duplicate bid detected</AlertTitle>
-              <AlertDescription>
-                &quot;{duplicateWarning.jobTitle}&quot; was already submitted by{" "}
-                {duplicateWarning.bidderName}. This bid was saved as a draft
-                with a link to the similar bid. You can still write a proposal,
-                but consider skipping submission.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Button type="submit" disabled={isPending || !parsed?.isValid}>
-            {isPending ? "Creating..." : "Create Bid & Write Proposal"}
-          </Button>
+          <div className="flex gap-3">
+            <Button type="submit" disabled={isPending || !parsed?.isValid}>
+              {isPending ? "Creating..." : "Create Bid & Write Proposal"}
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href="/bids">Cancel</Link>
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { BidDetailForm } from "@/components/bids/bid-detail-form";
+import { getFieldOptions } from "@/lib/actions/admin";
 import {
   getBid,
   getCurrentProfile,
@@ -16,10 +17,11 @@ interface BidDetailPageProps {
 
 export default async function BidDetailPage({ params }: BidDetailPageProps) {
   const { id } = await params;
-  const [bid, sources, profile] = await Promise.all([
+  const [bid, sources, profile, fieldOptions] = await Promise.all([
     getBid(id).catch(() => null),
     getSources(),
     getCurrentProfile(),
+    getFieldOptions(),
   ]);
 
   if (!bid) notFound();
@@ -40,6 +42,7 @@ export default async function BidDetailPage({ params }: BidDetailPageProps) {
           bid={bid}
           sources={sources ?? []}
           isManager={isManager}
+          fieldOptions={fieldOptions}
         />
       </div>
     </AppShell>
