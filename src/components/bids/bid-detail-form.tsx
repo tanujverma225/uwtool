@@ -61,7 +61,7 @@ interface BidDetailFormProps {
   isManager: boolean;
 }
 
-export function BidDetailForm({ bid, sources, isManager }: BidDetailFormProps) {
+export function BidDetailForm({ bid, isManager }: BidDetailFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [proposal, setProposal] = useState(bid.proposal ?? "");

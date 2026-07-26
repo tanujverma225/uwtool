@@ -11,6 +11,14 @@ import {
 import type { BidStatus, JobResponse } from "@/db/schema";
 import type { CreateBidInput, UpdateBidInput } from "@/types/database";
 
+function getJoinedProfileName(
+  profiles: { full_name: string } | { full_name: string }[] | null | undefined
+): string {
+  if (!profiles) return "Unknown";
+  if (Array.isArray(profiles)) return profiles[0]?.full_name ?? "Unknown";
+  return profiles.full_name;
+}
+
 export async function getCurrentProfile() {
   const supabase = await createClient();
   const {
@@ -94,9 +102,12 @@ export async function createBid(input: CreateBidInput) {
       ? {
           id: duplicate.id,
           jobTitle: duplicate.job_title,
-          bidderName:
-            (duplicate.profiles as { full_name: string } | null)?.full_name ??
-            "Unknown",
+          bidderName: getJoinedProfileName(
+            duplicate.profiles as
+              | { full_name: string }
+              | { full_name: string }[]
+              | null
+          ),
         }
       : null,
   };
