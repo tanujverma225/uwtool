@@ -3,13 +3,12 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ExternalLink, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, Sparkles } from "lucide-react";
 import {
   updateBid,
   submitBid,
   markClientViewed,
   markClientResponded,
-  deleteBid,
   fetchJobFromUrl,
 } from "@/lib/actions/bids";
 import { generateProposal } from "@/lib/actions/proposal";
@@ -155,19 +154,6 @@ export function BidDetailForm({ bid, sources, isManager, fieldOptions }: BidDeta
       if (result.proposal) setProposal(result.proposal);
       setMessage("Proposal generated. Review and edit before submitting.");
       router.refresh();
-    });
-  }
-
-  function handleDelete() {
-    if (!confirm("Delete this bid permanently? This cannot be undone.")) return;
-    startTransition(async () => {
-      const result = await deleteBid(bid.id);
-      if (result.error) {
-        setMessage(result.error);
-      } else {
-        router.push("/bids");
-        router.refresh();
-      }
     });
   }
 
@@ -484,16 +470,6 @@ export function BidDetailForm({ bid, sources, isManager, fieldOptions }: BidDeta
               Mark as Submitted
             </Button>
           )}
-        {isManager && (
-          <Button
-            onClick={handleDelete}
-            disabled={isPending}
-            variant="destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete Bid
-          </Button>
-        )}
       </div>
     </div>
   );

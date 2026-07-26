@@ -10,8 +10,9 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import Link from "next/link";
-import { useMemo, useState, useCallback } from "react";
-import { ExternalLink } from "lucide-react";
+import { useMemo, useState, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ExternalLink, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -36,6 +37,8 @@ import {
 } from "@/components/bids/bid-badges";
 import { JobResponseSelect } from "@/components/bids/job-response-select";
 import { StatusSelect } from "@/components/bids/status-select";
+import { deleteBid } from "@/lib/actions/bids";
+import { Button } from "@/components/ui/button";
 
 export interface SubmittedBidRow {
   id: string;
@@ -75,6 +78,8 @@ export function SubmittedBidsTable({
   currentUserId,
   isManager = false,
 }: SubmittedBidsTableProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [personFilter, setPersonFilter] = useState("all");
@@ -94,6 +99,28 @@ export function SubmittedBidsTable({
     (bidderId: string | undefined) =>
       isManager || (currentUserId && bidderId === currentUserId),
     [currentUserId, isManager]
+  );
+
+  const handleDelete = useCallback(
+    (bidId: string, jobTitle: string) => {
+      if (
+        !confirm(
+          `Delete "${jobTitle}"? This permanently removes the bid and cannot be undone.`
+        )
+      ) {
+        return;
+      }
+
+      startTransition(async () => {
+        const result = await deleteBid(bidId);
+        if (result.error) {
+          alert(result.error);
+          return;
+        }
+        router.refresh();
+      });
+    },
+    [router]
   );
 
   const columns = useMemo<ColumnDef<SubmittedBidRow>[]>(
@@ -211,8 +238,31 @@ export function SubmittedBidsTable({
         header: "Week",
         cell: ({ row }) => row.original.week_number ?? "—",
       },
+      ...(isManager
+        ? [
+            {
+              id: "actions",
+              header: "",
+              cell: ({ row }: { row: { original: SubmittedBidRow } }) => (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  disabled={isPending}
+                  onClick={() =>
+                    handleDelete(row.original.id, row.original.job_title)
+                  }
+                  aria-label={`Delete ${row.original.job_title}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ),
+            } as ColumnDef<SubmittedBidRow>,
+          ]
+        : []),
     ],
-    [canEditRow]
+    [canEditRow, isManager, isPending, handleDelete]
   );
 
   const table = useReactTable({
