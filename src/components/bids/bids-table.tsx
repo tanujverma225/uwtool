@@ -11,7 +11,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { ExternalLink } from "lucide-react";
 import {
   Table,
@@ -34,8 +34,8 @@ import { formatEstDate } from "@/lib/dates";
 import {
   PersonAvatar,
   SourceBadge,
-  StatusBadge,
 } from "@/components/bids/bid-badges";
+import { StatusSelect } from "@/components/bids/status-select";
 
 export interface BidTableRow {
   id: string;
@@ -46,6 +46,7 @@ export interface BidTableRow {
   shortlisted: boolean;
   similar_bid_id: string | null;
   profiles: {
+    id: string;
     full_name: string;
     avatar_url: string | null;
   } | null;
@@ -59,12 +60,16 @@ interface BidsTableProps {
   data: BidTableRow[];
   showPerson?: boolean;
   detailPath?: string;
+  currentUserId?: string;
+  isManager?: boolean;
 }
 
 export function BidsTable({
   data,
   showPerson = true,
   detailPath = "/bids",
+  currentUserId,
+  isManager = false,
 }: BidsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -75,6 +80,12 @@ export function BidsTable({
     if (statusFilter === "all") return data;
     return data.filter((row) => row.status === statusFilter);
   }, [data, statusFilter]);
+
+  const canEditRow = useCallback(
+    (bidderId: string | undefined) =>
+      isManager || (currentUserId && bidderId === currentUserId),
+    [currentUserId, isManager]
+  );
 
   const columns = useMemo<ColumnDef<BidTableRow>[]>(
     () => [
@@ -127,7 +138,22 @@ export function BidsTable({
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        cell: ({ row }) => {
+          const editable = canEditRow(row.original.profiles?.id);
+          if (editable) {
+            return (
+              <StatusSelect
+                bidId={row.original.id}
+                value={row.original.status}
+              />
+            );
+          }
+          return (
+            <span className="text-xs capitalize">
+              {row.original.status.replace(/_/g, " ")}
+            </span>
+          );
+        },
       },
       ...(showPerson
         ? [
@@ -165,7 +191,7 @@ export function BidsTable({
           ),
       },
     ],
-    [detailPath, showPerson]
+    [detailPath, showPerson, canEditRow]
   );
 
   const table = useReactTable({

@@ -48,7 +48,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
         <CardDescription>
-          Sign in to the UW Bidding Tool
+          Sign in to Bid Bot
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -64,6 +64,29 @@ export async function updateUserRole(userId: string, role: UserRole) {
   return { success: true };
 }
 
+export async function updateUserProfile(
+  userId: string,
+  updates: { fullName?: string }
+) {
+  const { error: authError } = await requireAdmin();
+  if (authError) return { error: authError };
+
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (updates.fullName !== undefined) payload.full_name = updates.fullName;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("id", userId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin");
+  return { success: true };
+}
+
 export async function createSource(name: string, color: string) {
   const { error: authError } = await requireAdmin();
   if (authError) return { error: authError };

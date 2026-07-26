@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UW Bidding Tool",
-  description: "Upwork proposal and bidder management tool",
+  title: "Bid Bot",
+  description: "Upwork proposal and bidder management",
 };
 
 export default function RootLayout({

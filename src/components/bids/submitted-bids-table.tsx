@@ -10,7 +10,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { ExternalLink } from "lucide-react";
 import {
   Table,
@@ -33,9 +33,9 @@ import { formatEstDate } from "@/lib/dates";
 import {
   PersonAvatar,
   SourceBadge,
-  StatusBadge,
 } from "@/components/bids/bid-badges";
-import { Badge } from "@/components/ui/badge";
+import { JobResponseSelect } from "@/components/bids/job-response-select";
+import { StatusSelect } from "@/components/bids/status-select";
 
 export interface SubmittedBidRow {
   id: string;
@@ -65,9 +65,16 @@ export interface SubmittedBidRow {
 interface SubmittedBidsTableProps {
   data: SubmittedBidRow[];
   profiles: { id: string; full_name: string }[];
+  currentUserId?: string;
+  isManager?: boolean;
 }
 
-export function SubmittedBidsTable({ data, profiles }: SubmittedBidsTableProps) {
+export function SubmittedBidsTable({
+  data,
+  profiles,
+  currentUserId,
+  isManager = false,
+}: SubmittedBidsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [personFilter, setPersonFilter] = useState("all");
@@ -82,6 +89,12 @@ export function SubmittedBidsTable({ data, profiles }: SubmittedBidsTableProps) 
       return true;
     });
   }, [data, personFilter, responseFilter]);
+
+  const canEditRow = useCallback(
+    (bidderId: string | undefined) =>
+      isManager || (currentUserId && bidderId === currentUserId),
+    [currentUserId, isManager]
+  );
 
   const columns = useMemo<ColumnDef<SubmittedBidRow>[]>(
     () => [
@@ -127,7 +140,22 @@ export function SubmittedBidsTable({ data, profiles }: SubmittedBidsTableProps) 
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        cell: ({ row }) => {
+          const editable = canEditRow(row.original.profiles?.id);
+          if (editable) {
+            return (
+              <StatusSelect
+                bidId={row.original.id}
+                value={row.original.status}
+              />
+            );
+          }
+          return (
+            <span className="text-xs capitalize">
+              {row.original.status.replace(/_/g, " ")}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "date_est",
@@ -144,14 +172,15 @@ export function SubmittedBidsTable({ data, profiles }: SubmittedBidsTableProps) 
         header: "Job Response",
         cell: ({ row }) => {
           const response = row.original.job_response ?? "no_response";
-          if (response === "no_response") {
-            return <Badge variant="destructive">No Response</Badge>;
+          const editable = canEditRow(row.original.profiles?.id);
+          if (editable) {
+            return (
+              <JobResponseSelect bidId={row.original.id} value={response} />
+            );
           }
-          return (
-            <Badge variant="success">
-              {response.charAt(0).toUpperCase() + response.slice(1)}
-            </Badge>
-          );
+          const label =
+            JOB_RESPONSES.find((r) => r.value === response)?.label ?? response;
+          return <span className="text-xs">{label}</span>;
         },
       },
       {
@@ -183,7 +212,7 @@ export function SubmittedBidsTable({ data, profiles }: SubmittedBidsTableProps) 
         cell: ({ row }) => row.original.week_number ?? "—",
       },
     ],
-    []
+    [canEditRow]
   );
 
   const table = useReactTable({

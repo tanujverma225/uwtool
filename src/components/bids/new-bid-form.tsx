@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createBid } from "@/lib/actions/bids";
+import { createBid, fetchJobFromUrl } from "@/lib/actions/bids";
 import { parseUpworkUrl } from "@/lib/upwork-url";
 import { DuplicateUrlCheck } from "@/components/bids/duplicate-url-check";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,32 @@ export function NewBidForm({ sources }: NewBidFormProps) {
   const [summary, setSummary] = useState("");
   const [questions, setQuestions] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fetchMessage, setFetchMessage] = useState<string | null>(null);
 
   const parsed = url ? parseUpworkUrl(url) : null;
+
+  function handleFetchJob() {
+    setFetchMessage(null);
+    setError(null);
+    startTransition(async () => {
+      const result = await fetchJobFromUrl(url);
+      if (result.error) {
+        setFetchMessage(result.error);
+        return;
+      }
+      const data = result.data;
+      if (!data?.fetched) {
+        setFetchMessage(
+          data?.warning ?? "Could not fetch job details. Enter manually."
+        );
+        return;
+      }
+      if (data.jobTitle) setJobTitle(data.jobTitle);
+      if (data.summary) setSummary(data.summary);
+      if (data.questions) setQuestions(data.questions);
+      setFetchMessage("Job details loaded. Review before creating bid.");
+    });
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,6 +115,21 @@ export function NewBidForm({ sources }: NewBidFormProps) {
           </div>
 
           <DuplicateUrlCheck url={url} />
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleFetchJob}
+              disabled={isPending || !parsed?.isValid}
+            >
+              Fetch job details from URL
+            </Button>
+          </div>
+          {fetchMessage && (
+            <p className="text-sm text-muted-foreground">{fetchMessage}</p>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="jobTitle">Job Title</Label>

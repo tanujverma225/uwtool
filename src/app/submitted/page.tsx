@@ -29,6 +29,8 @@ export default async function SubmittedPage() {
         <SubmittedBidsTable
           data={bids ?? []}
           profiles={profiles ?? []}
+          currentUserId={profile?.id}
+          isManager={isAdmin}
         />
       </div>
     </AppShell>

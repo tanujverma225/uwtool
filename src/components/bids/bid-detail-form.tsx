@@ -3,15 +3,18 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink, Sparkles, Trash2 } from "lucide-react";
 import {
   updateBid,
   submitBid,
   markClientViewed,
   markClientResponded,
+  deleteBid,
+  fetchJobFromUrl,
 } from "@/lib/actions/bids";
+import { generateProposal } from "@/lib/actions/proposal";
 import type { FieldOptions } from "@/lib/actions/admin";
-import { BID_STATUSES, type BidStatus } from "@/db/schema";
+import { BID_STATUSES, JOB_RESPONSES, type BidStatus, type JobResponse } from "@/db/schema";
 import { formatEstDate, formatEstDateTime } from "@/lib/dates";
 import { ProposalEditor } from "@/components/bids/proposal-editor";
 import {
@@ -41,6 +44,7 @@ interface BidDetailFormProps {
     job_title: string;
     url: string;
     status: BidStatus;
+    job_response: JobResponse | null;
     proposal: string | null;
     questions: string | null;
     summary: string | null;
@@ -52,6 +56,7 @@ interface BidDetailFormProps {
     client_viewed: boolean;
     client_responded: boolean;
     similar_bid_id: string | null;
+    source_id: string | null;
     date_est: string | null;
     bid_submitted_at: string | null;
     profiles: { full_name: string; avatar_url: string | null } | null;
@@ -63,12 +68,18 @@ interface BidDetailFormProps {
   fieldOptions?: FieldOptions;
 }
 
-export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormProps) {
+export function BidDetailForm({ bid, sources, isManager, fieldOptions }: BidDetailFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [proposal, setProposal] = useState(bid.proposal ?? "");
   const [jobTitle, setJobTitle] = useState(bid.job_title);
+  const [summary, setSummary] = useState(bid.summary ?? "");
+  const [questions, setQuestions] = useState(bid.questions ?? "");
+  const [sourceId, setSourceId] = useState(bid.source_id ?? "");
   const [status, setStatus] = useState<BidStatus>(bid.status);
+  const [jobResponse, setJobResponse] = useState<JobResponse>(
+    bid.job_response ?? "no_response"
+  );
   const [connectsUsed, setConnectsUsed] = useState(
     bid.connects_used?.toString() ?? ""
   );
@@ -98,7 +109,11 @@ export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormPro
     save({
       jobTitle,
       proposal,
+      summary: summary || undefined,
+      questions: questions || undefined,
+      sourceId: sourceId || null,
       status,
+      jobResponse,
       connectsUsed: connectsUsed ? parseInt(connectsUsed, 10) : undefined,
       country: country || undefined,
       proposalCountRange: proposalCountRange || undefined,
@@ -106,6 +121,53 @@ export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormPro
       shortlisted,
       clientViewed,
       clientResponded,
+    });
+  }
+
+  function handleFetchJob() {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await fetchJobFromUrl(bid.url);
+      if (result.error) {
+        setMessage(result.error);
+        return;
+      }
+      const data = result.data;
+      if (!data?.fetched) {
+        setMessage(data?.warning ?? "Could not fetch job details.");
+        return;
+      }
+      if (data.jobTitle) setJobTitle(data.jobTitle);
+      if (data.summary) setSummary(data.summary);
+      if (data.questions) setQuestions(data.questions);
+      setMessage("Job details fetched. Review and save.");
+    });
+  }
+
+  function handleGenerateProposal() {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await generateProposal(bid.id);
+      if (result.error) {
+        setMessage(result.error);
+        return;
+      }
+      if (result.proposal) setProposal(result.proposal);
+      setMessage("Proposal generated. Review and edit before submitting.");
+      router.refresh();
+    });
+  }
+
+  function handleDelete() {
+    if (!confirm("Delete this bid permanently? This cannot be undone.")) return;
+    startTransition(async () => {
+      const result = await deleteBid(bid.id);
+      if (result.error) {
+        setMessage(result.error);
+      } else {
+        router.push("/bids");
+        router.refresh();
+      }
     });
   }
 
@@ -179,6 +241,17 @@ export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormPro
           <CardTitle>Job Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleFetchJob}
+              disabled={isPending}
+            >
+              Fetch from Upwork URL
+            </Button>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="jobTitle">Job Title</Label>
             <Input
@@ -187,24 +260,57 @@ export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormPro
               onChange={(e) => setJobTitle(e.target.value)}
             />
           </div>
-          {bid.summary && (
-            <div className="space-y-2">
-              <Label>Summary</Label>
-              <p className="text-sm text-muted-foreground">{bid.summary}</p>
-            </div>
-          )}
-          {bid.questions && (
-            <div className="space-y-2">
-              <Label>Screening Questions</Label>
-              <p className="text-sm whitespace-pre-wrap">{bid.questions}</p>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label>Source</Label>
+            <Select value={sourceId} onValueChange={setSourceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select source" />
+              </SelectTrigger>
+              <SelectContent>
+                {sources.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="summary">Summary</Label>
+            <Textarea
+              id="summary"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              rows={4}
+              placeholder="Job description"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="questions">Screening Questions</Label>
+            <Textarea
+              id="questions"
+              value={questions}
+              onChange={(e) => setQuestions(e.target.value)}
+              rows={4}
+              placeholder="Client screening questions"
+            />
+          </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>Proposal</CardTitle>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={handleGenerateProposal}
+            disabled={isPending}
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate with Claude
+          </Button>
         </CardHeader>
         <CardContent>
           <ProposalEditor content={proposal} onChange={setProposal} />
@@ -230,6 +336,24 @@ export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormPro
                   {BID_STATUSES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Job Response</Label>
+              <Select
+                value={jobResponse}
+                onValueChange={(v) => setJobResponse(v as JobResponse)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {JOB_RESPONSES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -360,6 +484,16 @@ export function BidDetailForm({ bid, isManager, fieldOptions }: BidDetailFormPro
               Mark as Submitted
             </Button>
           )}
+        {isManager && (
+          <Button
+            onClick={handleDelete}
+            disabled={isPending}
+            variant="destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Bid
+          </Button>
+        )}
       </div>
     </div>
   );

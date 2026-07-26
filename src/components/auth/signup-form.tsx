@@ -57,7 +57,7 @@ export function SignupForm() {
       <CardHeader>
         <CardTitle>Create account</CardTitle>
         <CardDescription>
-          Join the UW Bidding Tool as a bidder
+          Join Bid Bot as a bidder
         </CardDescription>
       </CardHeader>
       <CardContent>

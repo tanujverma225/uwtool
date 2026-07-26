@@ -1,4 +1,4 @@
-# UW Bidding Tool
+# Bid Bot
 
 Upwork proposal and bidder management tool — replaces your Coda workflow with dedupe, proposal editing, submitted ledger, and team stats.
 

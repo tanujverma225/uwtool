@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateUserRole } from "@/lib/actions/admin";
+import { updateUserRole, updateUserProfile } from "@/lib/actions/admin";
 import type { UserRole } from "@/db/schema";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -19,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface UsersTableProps {
   users: {
@@ -39,6 +41,8 @@ export function UsersTable({ users }: UsersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   function handleRoleChange(userId: string, role: UserRole) {
     setMessage(null);
@@ -53,6 +57,25 @@ export function UsersTable({ users }: UsersTableProps) {
     });
   }
 
+  function startEdit(user: UsersTableProps["users"][0]) {
+    setEditingId(user.id);
+    setEditName(user.full_name);
+  }
+
+  function saveName(userId: string) {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await updateUserProfile(userId, { fullName: editName });
+      if (result.error) {
+        setMessage(result.error);
+      } else {
+        setEditingId(null);
+        setMessage("User updated.");
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="space-y-3">
       <div className="rounded-md border overflow-x-auto">
@@ -62,12 +85,23 @@ export function UsersTable({ users }: UsersTableProps) {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.full_name}</TableCell>
+                <TableCell>
+                  {editingId === user.id ? (
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="h-8"
+                    />
+                  ) : (
+                    <span className="font-medium">{user.full_name}</span>
+                  )}
+                </TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
                   <Select
@@ -88,6 +122,26 @@ export function UsersTable({ users }: UsersTableProps) {
                       ))}
                     </SelectContent>
                   </Select>
+                </TableCell>
+                <TableCell>
+                  {editingId === user.id ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => saveName(user.id)}
+                      disabled={isPending}
+                    >
+                      Save
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => startEdit(user)}
+                    >
+                      Edit
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

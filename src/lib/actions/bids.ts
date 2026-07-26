@@ -13,6 +13,7 @@ import type { CreateBidInput, UpdateBidInput } from "@/types/database";
 import { BID_EXPORT_COLUMNS, rowsToCsv } from "@/lib/export-csv";
 import { formatEstDate } from "@/lib/dates";
 import { requireAdmin } from "@/lib/auth";
+import { fetchUpworkJob } from "@/lib/upwork-fetch";
 
 function getJoinedProfileName(
   profiles: { full_name: string } | { full_name: string }[] | null | undefined
@@ -239,6 +240,62 @@ export async function markClientViewed(bidId: string, viewed: boolean) {
     updates.status = "viewed";
   }
   return updateBid(bidId, updates);
+}
+
+export async function fetchJobFromUrl(url: string) {
+  const {
+    data: { user },
+  } = await (await createClient()).auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const data = await fetchUpworkJob(url);
+  return { data };
+}
+
+export async function deleteBid(bidId: string) {
+  const { error: authError } = await requireAdmin();
+  if (authError) return { error: authError };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("bids").delete().eq("id", bidId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/bids");
+  revalidatePath("/submitted");
+  revalidatePath("/stats");
+  return { success: true };
+}
+
+function jobResponseToStatus(jobResponse: JobResponse): BidStatus | undefined {
+  switch (jobResponse) {
+    case "replied":
+      return "responded";
+    case "hired":
+      return "hired";
+    case "canceled":
+      return "canceled";
+    default:
+      return undefined;
+  }
+}
+
+export async function updateJobResponse(bidId: string, jobResponse: JobResponse) {
+  const updates: UpdateBidInput = { jobResponse };
+
+  if (jobResponse === "no_response") {
+    updates.clientResponded = false;
+  } else {
+    updates.clientResponded = true;
+    const status = jobResponseToStatus(jobResponse);
+    if (status) updates.status = status;
+  }
+
+  return updateBid(bidId, updates);
+}
+
+export async function updateBidStatus(bidId: string, status: BidStatus) {
+  return updateBid(bidId, { status });
 }
 
 export async function markClientResponded(bidId: string, responded: boolean) {

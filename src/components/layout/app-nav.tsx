@@ -33,7 +33,7 @@ export function AppNav({ userName, isAdmin }: AppNavProps) {
       <div className="container mx-auto flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-6">
           <Link href="/bids" className="font-semibold text-lg">
-            UW Bidding Tool
+            Bid Bot
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map(({ href, label, icon: Icon }) => (

@@ -2,13 +2,15 @@ import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { BidsTable } from "@/components/bids/bids-table";
 import { Button } from "@/components/ui/button";
-import { getBids } from "@/lib/actions/bids";
+import { getBids, getCurrentProfile } from "@/lib/actions/bids";
+import { isAdminRole } from "@/lib/auth";
 import { Plus } from "lucide-react";
 
 export default async function BidsPage() {
-  const bids = await getBids({
-    status: ["draft", "ready"],
-  });
+  const [bids, profile] = await Promise.all([
+    getBids({ status: ["draft", "ready"] }),
+    getCurrentProfile(),
+  ]);
 
   return (
     <AppShell>
@@ -27,7 +29,11 @@ export default async function BidsPage() {
             </Link>
           </Button>
         </div>
-        <BidsTable data={bids ?? []} />
+        <BidsTable
+          data={bids ?? []}
+          currentUserId={profile?.id}
+          isManager={isAdminRole(profile?.role)}
+        />
       </div>
     </AppShell>
   );
